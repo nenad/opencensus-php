@@ -1,0 +1,13 @@
+version: '3'
+services:
+  opencensus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: php
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      PHP_IDE_CONFIG: 'serverName=dev'
+      XDEBUG_CONFIG: 'remote_enable=1 remote_host=192.168.0.3'
