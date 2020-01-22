@@ -17,10 +17,11 @@
 
 namespace OpenCensus\Trace\Integrations\Guzzle;
 
+use GuzzleHttp\Message\ResponseInterface;
+use GuzzleHttp\Stream\StreamInterface;
 use OpenCensus\Core\Scope;
 use OpenCensus\Trace\Propagator\ArrayHeaders;
 use OpenCensus\Trace\Span;
-use OpenCensus\Trace\Tracer;
 use OpenCensus\Trace\Propagator\HttpHeaderPropagator;
 use OpenCensus\Trace\Propagator\PropagatorInterface;
 use GuzzleHttp\Event\BeforeEvent;
@@ -72,6 +73,7 @@ class EventSubscriber implements SubscriberInterface
      *
      * @param TracerInterface $tracer
      * @param PropagatorInterface $propagator Interface responsible for serializing trace context
+     * @param bool $logBody Should the body be logged in a span (up to 4096 bytes with Content-Length header set)
      */
     public function __construct(TracerInterface $tracer, PropagatorInterface $propagator = null, bool $logBody = true)
     {
@@ -88,8 +90,8 @@ class EventSubscriber implements SubscriberInterface
     public function getEvents()
     {
         return [
-            'before'    => ['onBefore'],
-            'end'       => ['onEnd']
+            'before' => ['onBefore'],
+            'end' => ['onEnd'],
         ];
     }
 
@@ -141,6 +143,7 @@ class EventSubscriber implements SubscriberInterface
 
         if ($response === null) {
             $this->scope->close();
+
             return;
         }
 
@@ -153,13 +156,7 @@ class EventSubscriber implements SubscriberInterface
         }
 
         if ($this->logBody) {
-            $bodyLength = (int)$response->getHeader('Content-Length');
-            if ($bodyLength > 0 && $bodyLength <= 4096) {
-                $body = (string)$response->getBody();
-            } else {
-                $body = 'Either Content-Length is missing, or it is bigger than 4096';
-            }
-            $this->span->addAttribute('response.body', $body);
+            $this->addBody($response);
         }
 
         $attrHeaders = [];
@@ -169,5 +166,25 @@ class EventSubscriber implements SubscriberInterface
         $this->span->addAttributes($attrHeaders);
 
         $this->scope->close();
+    }
+
+    /**
+     * @param ResponseInterface $response
+     */
+    private function addBody(ResponseInterface $response)
+    {
+        $bodyLength = (int)$response->getHeader('Content-Length');
+        if ($bodyLength > 0 && $bodyLength <= 4096) {
+            $body = $response->getBody();
+            if ($body instanceof StreamInterface && $body->isSeekable()) {
+                $responseBody = (string)$response->getBody();
+                $body->seek(0, SEEK_SET);
+            } else {
+                $responseBody = 'Response body is not a seekable object';
+            }
+        } else {
+            $responseBody = 'Either Content-Length is missing, or it is bigger than 4096';
+        }
+        $this->span->addAttribute('response.body', $responseBody);
     }
 }
