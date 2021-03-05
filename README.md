@@ -1,5 +1,7 @@
 # OpenCensus for PHP - A stats collection and distributed tracing framework
 
+## NOTE: This project is no longer maintained, use https://github.com/razorpay/opencensus-php instead
+
 > [Census][census-org] for PHP. Census provides a framework to measure a
 server's resource usage and collect performance stats. This repository contains
 PHP related utilities and supporting software needed by Census.
